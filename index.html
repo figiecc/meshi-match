@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>メシマッチ v0.29</title>
+  <link rel="stylesheet" href="style.css?v=0.29" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#ff7a3d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="メシマッチ" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Swipe to Match</p>
+        <h1>メシマッチ</h1>
+      </div>
+      <div class="header-actions">
+        <button id="noticeBtn" class="icon-button" aria-label="お知らせ">
+          <span id="noticeDot" class="notice-dot"></span>🔔
+        </button>
+        <button id="settingsBtn" class="icon-button" aria-label="設定">⚙️</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="homeScreen" class="screen legacy-home">
+        <div class="hero-card">
+          <p class="eyebrow">Friend List Mock</p>
+          <h2>友達がLikeした店から、<br />今日のご飯を決める。</h2>
+          <p class="lead">
+            自分の端末でお店をスワイプ。フレンド一覧から相手を選ぶと、
+            共通Likeや相手が行きたい店が見えます。
+          </p>
+
+          <div class="home-actions">
+            <button id="startSwipeBtn" class="primary-button">未判定のお店をスワイプ</button>
+            <button id="openMyLikesBtn" class="ghost-button">自分のLikeを見る</button>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="stat-card">
+            <span id="myLikeCount">0</span>
+            <p>自分のLike</p>
+          </div>
+          <div class="stat-card">
+            <span id="friendTotalLikeCount">0</span>
+            <p>フレンドLike</p>
+          </div>
+          <div class="stat-card">
+            <span id="remainingCount">0</span>
+            <p>未判定</p>
+          </div>
+        </div>
+
+        <section class="friend-section">
+          <div class="section-title-row">
+            <h3>フレンド一覧</h3>
+            <span class="count-badge">3人</span>
+          </div>
+          <p class="mini-lead">一緒に食べる相手を選ぶと、その人との候補が見えます。</p>
+          <div id="friendList" class="friend-list"></div>
+        </section>
+
+        <section class="result-section">
+          <div class="section-title-row">
+            <h3>最近Likeした店</h3>
+            <span id="recentLikeBadge" class="count-badge">0件</span>
+          </div>
+          <div id="recentLikeList" class="compact-list"></div>
+        </section>
+
+        <div class="note-card">
+          <h3>v0.21の目的</h3>
+          <p>
+            お知らせ・設定・ブランド表記を追加し、フレンド型アプリとしての基本UIを整える版です。
+          </p>
+        </div>
+      </section>
+
+
+      <section id="friendsScreen" class="screen">
+        <div class="result-head">
+          <p class="eyebrow">Friends</p>
+          <h2>友達</h2>
+          <p class="lead">フレンドごとに、共通Likeや相手が行きたい店を確認できます。</p>
+        </div>
+
+        <div class="friend-tools">
+          <div class="search-box">
+            <span>🔎</span>
+            <input id="friendSearchInput" type="search" placeholder="友達を検索" />
+          </div>
+          <button id="addFriendBtn" class="text-button">追加</button>
+        </div>
+
+        <div class="friend-request-box">
+          <div class="section-title-row tight">
+            <h3>友達リクエスト</h3>
+            <span id="requestCountBadge" class="count-badge">2件</span>
+          </div>
+          <div id="friendRequestList" class="request-list"></div>
+        </div>
+
+        <div class="friend-section">
+          <div class="section-title-row">
+            <h3>フレンド一覧</h3>
+            <span id="friendCountBadge" class="count-badge">0人</span>
+          </div>
+          <p class="mini-lead">100人以上でも探しやすいように、検索とコンパクト表示にしています。</p>
+          <div id="friendListTab" class="friend-list compact ultra"></div>
+        </div>
+      </section>
+
+      <section id="swipeScreen" class="screen active">
+        <div class="room-strip">
+          <span id="swipeModeLabel">お店をスワイプ</span>
+          <span id="progressLabel">1/20</span>
+        </div>
+
+        <div class="swipe-top">
+          <div>
+            <p class="eyebrow">Swipe</p>
+            <h2>今日の候補</h2>
+          </div>
+          <button id="refreshSwipeBtn" class="ghost-button small">更新</button>
+        </div>
+
+        <div class="filter-strip" id="moodFilterStrip">
+          <button class="filter-chip selected" data-filter="all">なんでも</button>
+          <button class="filter-chip" data-filter="がっつり">がっつり</button>
+          <button class="filter-chip" data-filter="軽め">軽め</button>
+          <button class="filter-chip" data-filter="安め">安め</button>
+          <button class="filter-chip" data-filter="デート">デート</button>
+          <button class="filter-chip" data-filter="飲み">飲み</button>
+          <button class="filter-chip" data-filter="カフェ">カフェ</button>
+        </div>
+
+        <div class="card-stage">
+          <article id="storeCard" class="food-card">
+            <div class="image-band" id="cardImageBand">
+              <span id="cardEmoji">🍜</span>
+            </div>
+            <div class="card-content">
+              <div class="card-row">
+                <p id="cardGenre" class="genre">ラーメン</p>
+                <p id="cardPrice" class="price">¥¥</p>
+              </div>
+              <h2 id="cardName">麺屋 星灯</h2>
+              <p id="cardMeta" class="meta">徒歩6分 / ★4.2 / 営業中</p>
+              <p id="cardDescription" class="description">濃い味で一気に満たしたい日に。</p>
+              <div id="friendLikeLine" class="friend-like-badge hidden">相手もLikeしています</div>
+              <div id="cardTags" class="tag-row"></div>
+            </div>
+          </article>
+        </div>
+
+        <div class="action-row three-reactions">
+          <button id="nopeBtn" class="reaction-button nope" aria-label="Nope">
+            <span>✕</span>
+            <strong>Nope</strong>
+          </button>
+          <button id="undoBtn" class="reaction-button undo" aria-label="戻る">
+            <span>↶</span>
+            <strong>戻る</strong>
+          </button>
+          <button id="likeBtn" class="reaction-button like" aria-label="Like">
+            <span>♡</span>
+            <strong>Like</strong>
+          </button>
+        </div>
+
+        <button id="superLikeBtn" class="superlike-button" aria-label="Superlike">🔥 Superlike</button>
+
+        <p class="hint">右スワイプで Like、左スワイプで Nope。本命は Superlike。</p>
+      </section>
+
+      <section id="friendDetailScreen" class="screen">
+        <div class="result-head">
+          <p class="eyebrow">Friend Match</p>
+          <h2 id="friendDetailTitle">相手とのメシマッチ</h2>
+          <p id="friendDetailSummary" class="lead"></p>
+        </div>
+
+
+        <div id="compatibilityPanel" class="compatibility-panel">
+          <div class="compatibility-score-box">
+            <span>相性</span>
+            <strong id="compatibilityScoreText">0%</strong>
+            <small id="compatibilityLabelText">まだ判断材料が少ない</small>
+          </div>
+          <div class="compatibility-detail-box">
+            <h3>合いやすい傾向</h3>
+            <p id="compatibilityCommentText">共通Likeが増えると、相性が見えやすくなります。</p>
+            <div id="compatibilityGenreChips" class="compatibility-chips"></div>
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="section-title-row">
+            <h3>2人ともLike</h3>
+            <span id="commonBadge" class="count-badge">0件</span>
+          </div>
+          <div id="commonList" class="result-list"></div>
+        </div>
+
+        <div class="result-section">
+          <div class="section-title-row">
+            <h3>フレンドだけLike</h3>
+            <span id="friendOnlyBadge" class="count-badge">0件</span>
+          </div>
+          <p class="mini-lead">自分はまだLikeしていないが、フレンドが行きたがっている店です。</p>
+          <div id="friendOnlyList" class="result-list"></div>
+        </div>
+
+        <div class="result-section">
+          <div class="section-title-row">
+            <h3>自分だけLike</h3>
+            <span id="myOnlyBadge" class="count-badge">0件</span>
+          </div>
+          <p class="mini-lead">自分が行きたい店。相手に提案する候補です。</p>
+          <div id="myOnlyList" class="result-list"></div>
+        </div>
+
+        <div class="roulette-panel">
+          <p class="eyebrow">Decision</p>
+          <h3>迷うならルーレットで決める</h3>
+          <p id="rouletteText">共通Likeがあればそこから、なければ片方Likeから選びます。</p>
+          <div id="rouletteDisplay" class="roulette-display">候補を選択中…</div>
+          <button id="rouletteBtn" class="primary-button">ルーレットで決める</button>
+        </div>
+
+        <div id="decisionPanel" class="decision-panel hidden">
+          <p class="eyebrow">Final Decision</p>
+          <h2 id="decisionTitle">この店に決定</h2>
+          <p id="decisionMeta"></p>
+          <textarea id="shareText" readonly></textarea>
+          <div class="result-actions">
+            <button id="copyShareBtn" class="primary-button">共有文をコピー</button>
+            <button id="clearDecisionBtn" class="ghost-button">決定を取り消す</button>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button id="backHomeFromDetailBtn" class="primary-button">ホームへ</button>
+          <button id="goSwipeFromDetailBtn" class="ghost-button">もっとスワイプする</button>
+        </div>
+      </section>
+
+      <section id="myLikesScreen" class="screen">
+        <div class="result-head">
+          <p class="eyebrow">My Likes</p>
+          <h2>自分のLike</h2>
+          <p class="lead">カテゴリからジャンルへ進んで、Like / Nope / Superlike を整理できます。</p>
+        </div>
+
+        <div class="like-tools">
+          <div class="search-box">
+            <span>🔎</span>
+            <input id="likeSearchInput" type="search" placeholder="履歴を検索" />
+          </div>
+        </div>
+
+        <section class="decision-history-panel">
+          <div class="section-title-row">
+            <h3>最近決めた店</h3>
+            <span id="decisionHistoryCount" class="count-badge">0件</span>
+          </div>
+          <div id="decisionHistoryList" class="decision-history-list"></div>
+        </section>
+
+        <div class="history-tabs">
+          <button class="history-tab selected" data-history="like">Like</button>
+          <button class="history-tab" data-history="nope">Nope</button>
+          <button class="history-tab" data-history="superlike">Superlike</button>
+          <button class="history-tab" data-history="unanswered">未判定</button>
+        </div>
+
+        <button id="historyReswipeBtn" class="history-reswipe-button">Like済みを再スワイプ</button>
+
+        <section id="inlineReswipePanel" class="inline-reswipe-panel hidden">
+          <div class="inline-reswipe-head">
+            <div>
+              <p class="eyebrow">Re-swipe</p>
+              <h3 id="inlineReswipeTitle">Like済みを再スワイプ</h3>
+            </div>
+            <button id="cancelInlineReswipeBtn" class="ghost-button small">取り消し</button>
+          </div>
+
+          <article id="inlineReswipeCard" class="inline-reswipe-card">
+            <div class="inline-reswipe-emoji" id="inlineReswipeEmoji">🍜</div>
+            <div class="inline-reswipe-body">
+              <p id="inlineReswipeGenre" class="genre">ラーメン</p>
+              <h2 id="inlineReswipeName">麺屋 星灯</h2>
+              <p id="inlineReswipeMeta" class="meta">徒歩6分 / ★4.2 / 営業中</p>
+              <p id="inlineReswipeDescription" class="description">説明</p>
+              <div id="inlineReswipeTags" class="tag-row"></div>
+              <span id="inlineCurrentJudgement" class="current-judgement">現在：Like</span>
+            </div>
+          </article>
+
+          <div class="inline-reswipe-actions">
+            <button class="detail-reaction nope" data-inline-judgement="nope">Nope</button>
+            <button class="detail-reaction superlike" data-inline-judgement="superlike">Superlike</button>
+            <button class="detail-reaction like" data-inline-judgement="like">Like</button>
+          </div>
+
+          <div class="inline-reswipe-subactions">
+            <button id="undoInlineReswipeBtn" class="ghost-button">1つ戻す</button>
+            <button id="skipInlineReswipeBtn" class="ghost-button">変更せず次へ</button>
+          </div>
+
+          <p id="inlineReswipeProgress" class="hint">1/1</p>
+        </section>
+
+        <div id="myLikesFolderList" class="category-folder-list"></div>
+
+        <div class="result-actions">
+          <button id="backHomeFromMyLikesBtn" class="primary-button">ホームへ</button>
+          <button id="clearOnlyMyLikesBtn" class="ghost-button">Like履歴をリセット</button>
+        </div>
+      </section>
+
+      <section id="noticeScreen" class="screen">
+        <div class="panel">
+          <p class="eyebrow">Notice</p>
+          <h2>お知らせ</h2>
+          <div class="notice-history-head">
+        <strong>お知らせ履歴</strong>
+        <span id="noticeHistoryCountLegacy">0件</span>
+      </div>
+      <div id="noticeListLegacy" class="notice-list">
+        <article class="notice-item unread">
+          <p class="notice-date">2026/04/28</p>
+          <h3>v0.29：データ移行とPWA化</h3>
+          <p>データの書き出し/読み込みと、ホーム画面追加に向けたPWA対応を追加しました。</p>
+        </article>
+      </div>
+          <div class="result-actions">
+            <button id="backHomeFromNoticeBtn" class="primary-button">ホームへ</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="settingsScreen" class="screen">
+        <div class="panel">
+          <p class="eyebrow">Settings</p>
+          <h2>設定</h2>
+
+          <div class="settings-block">
+            <h3>プロフィール</h3>
+            <label class="input-label">
+              表示名
+              <input id="displayNameInput" type="text" value="カイ" maxlength="12" />
+            </label>
+            <p class="mini-lead">v0.23では、この端末内だけの表示名です。</p>
+          </div>
+
+          <div class="settings-block">
+            <h3>データ</h3>
+            <p class="mini-lead">
+              現在の保存方式：この端末のブラウザに保存しています。別端末とは共有されません。
+            </p>
+            <div class="result-actions">
+              <button id="resetSwipeBtn" class="ghost-button">スワイプ履歴をリセット</button>
+              <button id="resetAllBtn" class="danger-button">全データをリセット</button>
+            </div>
+          </div>
+
+          <div class="settings-block">
+            <h3>アプリ情報</h3>
+            <div class="info-list">
+              <div><span>ブランド</span><strong>メシマッチ</strong></div>
+              <div><span>バージョン</span><strong>v0.29</strong></div>
+              <div><span>状態</span><strong>フレンド型モック</strong></div>
+            </div>
+          </div>
+
+          <div class="result-actions">
+            <button id="backHomeFromSettingsBtn" class="primary-button">保存してホームへ</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="doneScreen" class="screen">
+        <div class="panel center">
+          <p class="eyebrow">Done</p>
+          <h2>未判定のお店を見終わりました</h2>
+          <p class="lead">自分のLike履歴は保存されています。フレンド一覧から共通Likeを確認しましょう。</p>
+          <div class="result-actions">
+            <button id="doneToHomeBtn" class="primary-button">ホームへ</button>
+            <button id="doneToMyLikesBtn" class="ghost-button">自分のLikeを見る</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+
+    <nav class="bottom-nav redesigned" aria-label="下部メニュー">
+      <button id="navFriendsBtn" data-nav="friends" class="bottom-nav-item">
+        <span>👥</span>
+        <strong>友達</strong>
+      </button>
+      <button id="navSwipeBtn" data-nav="swipe" class="bottom-nav-item active home-center">
+        <span>🍽️</span>
+        <strong>スワイプ</strong>
+      </button>
+      <button id="navLikesBtn" data-nav="likes" class="bottom-nav-item">
+        <span>♡</span>
+        <strong>Like</strong>
+      </button>
+    </nav>
+
+
+    <footer class="app-footer">
+      <span>メシマッチ</span>
+      <span>v0.29</span>
+    </footer>
+  </div>
+
+
+  <div id="noticeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card pop-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Notice</p>
+          <h2>お知らせ</h2>
+        </div>
+        <button id="closeNoticeModalBtn" class="icon-button">×</button>
+      </div>
+      
+      <div id="noticeList" class="notice-list">
+        <article class="notice-item unread">
+          <p class="notice-date">2026/04/28</p>
+          <h3>v0.29：データ移行とPWA化</h3>
+          <p>データの書き出し/読み込みと、ホーム画面追加に向けたPWA対応を追加しました。</p>
+        </article>
+        <article class="notice-item">
+          <p class="notice-date">2026/04/28</p>
+          <h3>v0.24：決定履歴とお知らせ履歴</h3>
+          <p>決定履歴を保存し、再スワイプ時のSuperlikeを中央に配置しました。</p>
+        </article>
+        <article class="notice-item">
+          <p class="notice-date">2026/04/28</p>
+          <h3>v0.23：仮アカウント管理</h3>
+          <p>ログイン前提のデータ構造に変更し、仮ユーザー切り替えと作成を追加しました。</p>
+        </article>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card pop-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Settings</p>
+          <h2>設定</h2>
+        </div>
+        <button id="closeSettingsModalBtn" class="icon-button">×</button>
+      </div>
+
+      <div class="settings-block first">
+        <h3>プロフィール</h3>
+        <label class="input-label">
+          表示名
+          <input id="displayNameInputModal" type="text" value="カイ" maxlength="12" />
+        </label>
+        <p class="mini-lead">v0.23では、この端末内だけの表示名です。</p>
+      </div>
+
+      <div class="settings-block account-block">
+        <h3>アカウント</h3>
+        <div class="account-current-card">
+          <span>ログイン中のアカウント</span>
+          <strong id="currentUserNameText">カイ</strong>
+          <small id="currentUserIdText">user_kai</small>
+        </div>
+        <p class="mini-lead">
+          v0.27では、ログインできるアカウントは1つだけです。ユーザー切り替えは廃止しました。
+        </p>
+      </div>
+      <div class="settings-block">
+        <h3>データ</h3>
+        <p class="mini-lead">現在の保存方式：この端末のブラウザに保存しています。別端末とは共有されません。</p>
+        <div class="result-actions">
+          <button id="resetSwipeModalBtn" class="ghost-button">スワイプ履歴をリセット</button>
+          <button id="resetAllModalBtn" class="danger-button">全データをリセット</button>
+        </div>
+      </div>
+
+
+      <div class="settings-block">
+        <h3>友達リクエスト</h3>
+        <label class="toggle-row">
+          <span>
+            <strong>友達リクエストを受け取らない</strong>
+            <small>オンにすると、友達タブのリクエスト欄を非表示にします。</small>
+          </span>
+          <input id="blockFriendRequestsToggle" type="checkbox" />
+        </label>
+      </div>
+
+
+      <div class="settings-block data-management-block">
+        <h3>データ管理</h3>
+        <p class="mini-lead">
+          Like / Nope / Superlike、友達、決定履歴、訪問状態、設定をJSONファイルとして移行できます。
+        </p>
+        <div class="result-actions data-actions">
+          <button id="exportDataBtn" class="ghost-button">データを書き出す</button>
+          <label class="import-data-label">
+            データを読み込む
+            <input id="importDataInput" type="file" accept="application/json,.json" />
+          </label>
+        </div>
+        <p class="mini-lead">
+          読み込みを行うと、現在の端末内データは読み込んだ内容で置き換わります。
+        </p>
+      </div>
+
+      <div class="settings-block">
+        <h3>アプリ情報</h3>
+        <div class="info-list">
+          <div><span>ブランド</span><strong>メシマッチ</strong></div>
+          <div><span>バージョン</span><strong>v0.29</strong></div>
+          <div><span>状態</span><strong>フレンド型モック</strong></div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button id="saveSettingsModalBtn" class="primary-button">保存する</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="friendAddModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card pop-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Add Friend</p>
+          <h2>フレンド追加</h2>
+        </div>
+        <button id="closeFriendAddModalBtn" class="icon-button">×</button>
+      </div>
+
+      <div class="friend-code-card">
+        <p class="mini-label">自分のフレンドコード</p>
+        <div class="friend-code-row">
+          <strong id="myFriendCode">MESHI-KAI-0428</strong>
+          <button id="copyFriendCodeBtn" class="text-button">コピー</button>
+        </div>
+        <p class="mini-lead">v0.23では実際の通信はせず、体験確認用のコードです。</p>
+      </div>
+
+      <div class="settings-block first">
+        <h3>相手のコードを入力</h3>
+        <label class="input-label">
+          フレンドコード
+          <input id="friendCodeInput" type="text" placeholder="例：MESHI-AOI-1234" maxlength="24" />
+        </label>
+        <label class="input-label">
+          表示名
+          <input id="friendNameInput" type="text" placeholder="例：あおい" maxlength="12" />
+        </label>
+        <p class="mini-lead">入力した名前で、仮フレンドを追加します。Like履歴もサンプルで自動生成されます。</p>
+      </div>
+
+      <div class="result-actions">
+        <button id="addFriendConfirmBtn" class="primary-button">仮フレンドを追加</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="storeDetailModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card pop-card store-detail-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Rejudge Card</p>
+          <h2 id="detailStoreName">再判定</h2>
+        </div>
+        <button id="closeStoreDetailModalBtn" class="icon-button">×</button>
+      </div>
+
+      <div id="detailStoreBody"></div>
+
+
+      <div class="visit-status-panel">
+        <p class="mini-label">訪問状態</p>
+        <div class="visit-status-grid">
+          <button class="visit-status-button" data-visit-status="unvisited">未訪問</button>
+          <button class="visit-status-button" data-visit-status="visited">行ったことある</button>
+          <button class="visit-status-button" data-visit-status="want_again">また行きたい</button>
+          <button class="visit-status-button" data-visit-status="cooldown">しばらくいい</button>
+        </div>
+      </div>
+
+      <div class="detail-reaction-panel">
+        <p class="mini-label">判定を変更</p>
+        <div class="detail-reaction-grid">
+          <button class="detail-reaction nope" data-detail-action="nope">Nope</button>
+          <button class="detail-reaction like" data-detail-action="like">Like</button>
+          <button class="detail-reaction superlike" data-detail-action="superlike">Superlike</button>
+        </div>
+        <button id="detailUnansweredBtn" class="ghost-button compact-action">未判定に戻す</button>
+      </div>
+
+      <div class="result-actions">
+        <a id="detailMapLink" class="primary-button map-primary" target="_blank" rel="noopener">Mapsで開く</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">コピーしました</div>
+  <script src="app.js?v=0.29"></script>
+</body>
+</html>
