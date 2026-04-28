@@ -9,7 +9,7 @@ let friends = [
   { id: "friend_b", name: "友達B", note: "カフェ・軽めが好きなフレンド" }
 ];
 
-const stores = [
+let stores = [
   { id: "ramen_hoshitomoshi", name: "麺屋 星灯", genre: "ラーメン", price: "¥¥", distance: "徒歩6分", rating: "★4.2", status: "営業中", emoji: "🍜", description: "濃い味で一気に満たしたい日に。疲労回復という名の塩分補給。", tags: ["がっつり", "一人向け", "濃い味"] },
   { id: "curry_namaste", name: "ナマステ食堂", genre: "インドカレー", price: "¥¥", distance: "徒歩8分", rating: "★4.1", status: "営業中", emoji: "🍛", description: "ナンで気分を立て直すタイプの昼夜兼用候補。", tags: ["がっつり", "友達向け", "スパイス"] },
   { id: "teishoku_yorimichi", name: "よりみち定食", genre: "定食", price: "¥", distance: "徒歩5分", rating: "★4.0", status: "営業中", emoji: "🍱", description: "普通にちゃんと食べたい日の安定択。派手さより勝率。", tags: ["安め", "健康寄り", "一人向け"] },
@@ -66,29 +66,29 @@ const initialFriendLikes = {
 const notices = [
   {
     date: "2026/04/29",
-    title: "v0.30：スワイプ操作修正",
-    body: "未判定を見終わった後にスワイプへ戻ると全店舗が再表示される問題と、スマホのスワイプ操作を修正しました。",
+    title: "v0.34：現在地1km圏内の店舗取得",
+    body: "現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。取得結果は6時間キャッシュします。",
     unread: true
   },
   {
-    date: "2026/04/28",
-    title: "v0.29：データ移行とPWA化",
-    body: "データの書き出し/読み込みと、ホーム画面追加に向けたPWA対応を追加しました。"
+    date: "2026/04/29",
+    title: "v0.33：店舗手動追加削除",
+    body: "店舗の手動追加・編集UIを削除し、周辺店舗の自動取得を前提に整理しました。"
   },
   {
-    date: "2026/04/28",
-    title: "v0.28：友達ごとの相性表示",
-    body: "友達一覧と友達詳細に、相性スコア・合いやすいジャンル・判断コメントを追加しました。"
+    date: "2026/04/29",
+    title: "v0.32：店舗データ追加・編集",
+    body: "起動直後のスワイプ不具合とボタン反応を修正し、店舗データ追加・編集UIを追加しました。"
   },
   {
-    date: "2026/04/28",
-    title: "v0.27：単一アカウント化",
-    body: "ユーザー切り替えと仮ユーザー作成を削除し、ログイン中のアカウントは1つだけにしました。"
+    date: "2026/04/29",
+    title: "v0.31：PWA自動更新強化",
+    body: "ホーム画面に追加し直さなくても、アプリ起動時に最新版へ更新されやすいようにしました。"
   },
   {
-    date: "2026/04/28",
-    title: "v0.26：訪問状態追加",
-    body: "店舗ごとに「未訪問 / 行ったことある / また行きたい / しばらくいい」を保存できるようにしました。"
+    date: "2026/04/29",
+    title: "v0.30：スワイプ操作修正",
+    body: "未判定を見終わった後の戻り動作と、スマホのスワイプ操作を修正しました。"
   }
 ];
 
@@ -131,7 +131,12 @@ const state = {
   friendRequestsByUser: {},
   settingsByUser: {},
   decisionHistoryByUser: {},
-  visitStatusByUser: {}
+  visitStatusByUser: {},
+  customStores: [],
+  editingStoreId: null,
+  nearbyStores: [],
+  nearbyCache: null,
+  nearbyFetching: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -172,7 +177,10 @@ function saveState() {
     friendRequestsByUser: state.friendRequestsByUser,
     settingsByUser: state.settingsByUser,
     decisionHistoryByUser: state.decisionHistoryByUser,
-    visitStatusByUser: state.visitStatusByUser
+    visitStatusByUser: state.visitStatusByUser,
+    customStores: state.customStores,
+    nearbyStores: state.nearbyStores,
+    nearbyCache: state.nearbyCache
   }));
 }
 
@@ -212,6 +220,285 @@ function showScreen(id) {
 
 function getFriend(friendId = state.selectedFriendId) {
   return friends.find(friend => friend.id === friendId) || friends[0];
+}
+
+const baseStoreIds = new Set(stores.map(store => store.id));
+
+function mergeCustomStores() {
+  // v0.34: 手動追加店舗は廃止。周辺取得店舗をスワイプ候補に混ぜる。
+  stores = stores.filter(store => baseStoreIds.has(store.id));
+  (state.nearbyStores || []).forEach(nearbyStore => {
+    const index = stores.findIndex(store => store.id === nearbyStore.id);
+    if (index >= 0) stores[index] = nearbyStore;
+    else stores.push(nearbyStore);
+  });
+}
+
+function readStoreForm() {
+  const name = ($("storeNameInput")?.value || "").trim();
+  const genre = ($("storeGenreInput")?.value || "").trim() || "その他";
+  const emoji = ($("storeEmojiInput")?.value || "").trim() || "🍽️";
+  const distance = ($("storeDistanceInput")?.value || "").trim() || "距離未設定";
+  const price = ($("storePriceInput")?.value || "").trim() || "¥?";
+  const rating = ($("storeRatingInput")?.value || "").trim() || "★-";
+  const status = ($("storeStatusInput")?.value || "").trim() || "未確認";
+  const description = ($("storeDescriptionInput")?.value || "").trim() || "手動で追加したお店です。";
+  const tags = ($("storeTagsInput")?.value || "")
+    .split(",")
+    .map(tag => tag.trim())
+    .filter(Boolean);
+
+  if (!name) {
+    showToast("店名を入力してください");
+    return null;
+  }
+
+  if (!tags.length) tags.push(genre);
+
+  return {
+    id: state.editingStoreId || `custom_store_${Date.now()}`,
+    name,
+    genre,
+    emoji,
+    distance,
+    price,
+    rating,
+    status,
+    description,
+    tags,
+    custom: true
+  };
+}
+
+function fillStoreForm(store) {
+  state.editingStoreId = store.id;
+  $("storeNameInput").value = store.name || "";
+  $("storeGenreInput").value = store.genre || "";
+  $("storeEmojiInput").value = store.emoji || "";
+  $("storeDistanceInput").value = store.distance || "";
+  $("storePriceInput").value = store.price || "";
+  $("storeRatingInput").value = store.rating || "";
+  $("storeStatusInput").value = store.status || "";
+  $("storeDescriptionInput").value = store.description || "";
+  $("storeTagsInput").value = (store.tags || []).join(", ");
+}
+
+function clearStoreForm() {}
+
+function saveCustomStore() { showToast("手動追加は削除しました"); }
+
+function deleteCustomStore(storeId) { showToast("手動追加は削除しました"); }
+
+function renderStoreManagerList() {}
+
+function openStoreManager() { showToast("店舗データは周辺から自動取得する方針です"); }
+
+function closeStoreManager() {}
+
+const NEARBY_RADIUS_METERS = 1000;
+const NEARBY_CACHE_MS = 6 * 60 * 60 * 1000;
+const NEARBY_REUSE_DISTANCE_METERS = 300;
+const NEARBY_LIMIT = 30;
+
+function setNearbyStatus(text) {
+  const el = $("nearbyStatusText");
+  if (el) el.textContent = text;
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = value => value * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("位置情報に対応していません"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: false,
+      timeout: 12000,
+      maximumAge: 5 * 60 * 1000
+    });
+  });
+}
+
+function canUseNearbyCache(lat, lon) {
+  const cache = state.nearbyCache;
+  if (!cache || !cache.timestamp || !cache.lat || !cache.lon || !Array.isArray(cache.stores)) return false;
+
+  const age = Date.now() - cache.timestamp;
+  if (age > NEARBY_CACHE_MS) return false;
+
+  const moved = distanceMeters(lat, lon, cache.lat, cache.lon);
+  return moved <= NEARBY_REUSE_DISTANCE_METERS;
+}
+
+function osmAmenityToGenre(amenity) {
+  if (amenity === "cafe") return "カフェ";
+  if (amenity === "fast_food") return "ファストフード";
+  if (amenity === "bar") return "バー";
+  if (amenity === "pub") return "パブ";
+  return "レストラン";
+}
+
+function osmAmenityToEmoji(amenity) {
+  if (amenity === "cafe") return "☕";
+  if (amenity === "fast_food") return "🍔";
+  if (amenity === "bar") return "🍸";
+  if (amenity === "pub") return "🍺";
+  return "🍽️";
+}
+
+function buildOverpassQuery(lat, lon) {
+  return `
+[out:json][timeout:15];
+(
+  node["amenity"~"^(restaurant|cafe|fast_food|bar|pub)$"](around:${NEARBY_RADIUS_METERS},${lat},${lon});
+  way["amenity"~"^(restaurant|cafe|fast_food|bar|pub)$"](around:${NEARBY_RADIUS_METERS},${lat},${lon});
+  relation["amenity"~"^(restaurant|cafe|fast_food|bar|pub)$"](around:${NEARBY_RADIUS_METERS},${lat},${lon});
+);
+out center ${NEARBY_LIMIT};
+`;
+}
+
+function normalizeOsmStore(element, originLat, originLon) {
+  const tags = element.tags || {};
+  const lat = element.lat || element.center?.lat;
+  const lon = element.lon || element.center?.lon;
+  if (!lat || !lon) return null;
+
+  const name = tags.name || tags["name:ja"] || tags["name:en"];
+  if (!name) return null;
+
+  const amenity = tags.amenity || "restaurant";
+  const genre = osmAmenityToGenre(amenity);
+  const distance = Math.round(distanceMeters(originLat, originLon, lat, lon));
+  const cuisine = tags.cuisine ? String(tags.cuisine).split(";").slice(0, 2) : [];
+  const opening = tags.opening_hours ? "営業時間情報あり" : "営業未確認";
+
+  return {
+    id: `osm_${element.type}_${element.id}`,
+    name,
+    genre,
+    emoji: osmAmenityToEmoji(amenity),
+    distance: distance < 1000 ? `約${distance}m` : `約${(distance / 1000).toFixed(1)}km`,
+    price: "価格未取得",
+    rating: "評価未取得",
+    status: opening,
+    description: `現在地から${distance < 1000 ? `約${distance}m` : `約${(distance / 1000).toFixed(1)}km`}の${genre}です。OpenStreetMapのデータをもとに表示しています。`,
+    tags: [genre, ...cuisine, "周辺取得"].slice(0, 5),
+    lat,
+    lon,
+    source: "openstreetmap"
+  };
+}
+
+async function fetchNearbyStores(force = false) {
+  if (state.nearbyFetching) return;
+
+  const button = $("fetchNearbyBtn");
+  state.nearbyFetching = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "取得中";
+  }
+
+  try {
+    setNearbyStatus("現在地を取得しています");
+    const position = await getCurrentPosition();
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+
+    if (!force && canUseNearbyCache(lat, lon)) {
+      state.nearbyStores = state.nearbyCache.stores;
+      mergeCustomStores();
+      setNearbyStatus(`キャッシュから${state.nearbyStores.length}件を表示中`);
+      resetSwipeQueueToUnanswered();
+      saveState();
+      return;
+    }
+
+    setNearbyStatus("周辺店舗を取得しています");
+    const query = buildOverpassQuery(lat, lon);
+    const url = "https://overpass-api.de/api/interpreter";
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8"
+      },
+      body: query
+    });
+
+    if (!response.ok) throw new Error(`Overpass error: ${response.status}`);
+
+    const data = await response.json();
+    const normalized = (data.elements || [])
+      .map(element => normalizeOsmStore(element, lat, lon))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const da = a.distance.includes("km") ? parseFloat(a.distance.replace("約", "")) * 1000 : parseInt(a.distance.replace(/\D/g, ""), 10);
+        const db = b.distance.includes("km") ? parseFloat(b.distance.replace("約", "")) * 1000 : parseInt(b.distance.replace(/\D/g, ""), 10);
+        return da - db;
+      })
+      .slice(0, NEARBY_LIMIT);
+
+    if (!normalized.length) {
+      throw new Error("周辺店舗が見つかりませんでした");
+    }
+
+    state.nearbyStores = normalized;
+    state.nearbyCache = {
+      timestamp: Date.now(),
+      lat,
+      lon,
+      radius: NEARBY_RADIUS_METERS,
+      stores: normalized
+    };
+
+    mergeCustomStores();
+    resetSwipeQueueToUnanswered();
+    saveState();
+    setNearbyStatus(`現在地1km以内から${normalized.length}件を取得`);
+    showToast("周辺店舗を取得しました");
+  } catch (error) {
+    console.error(error);
+    setNearbyStatus("取得できませんでした。サンプル店舗で動作中");
+    showToast("周辺店舗の取得に失敗しました");
+  } finally {
+    state.nearbyFetching = false;
+    if (button) {
+      button.disabled = false;
+      button.textContent = "周辺取得";
+    }
+  }
+}
+
+function resetSwipeQueueToUnanswered() {
+  const unanswered = getUnansweredStores();
+  state.swipeQueue = unanswered.map(store => store.id);
+  state.index = 0;
+  state.historyStack = [];
+
+  if (!state.swipeQueue.length) {
+    showScreen("doneScreen");
+    setActiveNav("swipeScreen");
+    return;
+  }
+
+  showScreen("swipeScreen");
+  setActiveNav("swipeScreen");
+  renderCard();
 }
 
 function getStore(storeId) {
@@ -266,10 +553,12 @@ function closeAllModals() {
   const settingsModal = $("settingsModal");
   const friendAddModal = $("friendAddModal");
   const storeDetailModal = $("storeDetailModal");
+  const storeManagerModal = $("storeManagerModal");
   if (noticeModal) noticeModal.classList.add("hidden");
   if (settingsModal) settingsModal.classList.add("hidden");
   if (friendAddModal) friendAddModal.classList.add("hidden");
   if (storeDetailModal) storeDetailModal.classList.add("hidden");
+  if (storeManagerModal) storeManagerModal.classList.add("hidden");
   document.body.classList.remove("modal-open");
 }
 
@@ -284,8 +573,12 @@ function showHomeTab() {
 function openSwipeTab() {
   closeAllModals();
   syncMoodFilterUI();
+  mergeCustomStores();
 
-  if (!state.swipeQueue || !state.swipeQueue.length || state.index >= state.swipeQueue.length) {
+  if (!state.activeFilter) state.activeFilter = "all";
+
+  const queueInvalid = !state.swipeQueue || !state.swipeQueue.length || state.index >= state.swipeQueue.length;
+  if (queueInvalid) {
     const unanswered = getUnansweredStores();
     state.swipeQueue = unanswered.map(store => store.id);
     state.index = 0;
@@ -1690,6 +1983,10 @@ function resetAll() {
   state.settingsByUser = { user_kai: { blockFriendRequests: false } };
   state.decisionHistoryByUser = { user_kai: [] };
   state.visitStatusByUser = { user_kai: {} };
+  state.customStores = [];
+  state.nearbyStores = [];
+  state.nearbyCache = null;
+  mergeCustomStores();
   applyAccountToLegacy();
   me.name = "カイ";
   if ($("displayNameInput")) $("displayNameInput").value = "カイ";
@@ -1881,6 +2178,7 @@ function closeModalOnBackdrop(event) {
   if (event.target.id === "settingsModal") closeSettingsModal();
   if (event.target.id === "friendAddModal") closeFriendAddModal();
   if (event.target.id === "storeDetailModal") closeStoreDetailModal();
+
 }
 
 function on(id, event, handler) {
@@ -1975,6 +2273,7 @@ function importDataFromFile(file) {
       ensureAccountData();
       forceSingleAccount();
       applyAccountToLegacy();
+      mergeCustomStores();
       saveState();
 
       showToast("データを読み込みました");
@@ -1995,11 +2294,43 @@ function importDataFromFile(file) {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js")
-      .catch(error => {
-        console.info("Service worker registration skipped:", error);
+  let refreshing = false;
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("./service-worker.js");
+
+      // アプリ起動時に更新確認。ホーム画面追加済みでも最新版へ寄せる。
+      registration.update();
+
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+
+      registration.addEventListener("updatefound", () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            newWorker.postMessage({ type: "SKIP_WAITING" });
+          }
+        });
       });
+
+      // iOS Safariなどでupdatefoundが鈍い場合の保険。
+      setInterval(() => {
+        registration.update().catch(() => null);
+      }, 60 * 60 * 1000);
+    } catch (error) {
+      console.info("Service worker registration skipped:", error);
+    }
   });
 }
 
@@ -2048,6 +2379,7 @@ function attachEvents() {
   on("saveSettingsModalBtn", "click", saveSettingsAndHome);
   on("exportDataBtn", "click", exportData);
   on("importDataInput", "change", (event) => importDataFromFile(event.target.files?.[0]));
+  on("fetchNearbyBtn", "click", () => fetchNearbyStores(false));
   on("resetSwipeModalBtn", "click", resetSwipeHistory);
   on("resetAllModalBtn", "click", resetAll);
 
@@ -2148,6 +2480,37 @@ function attachEvents() {
   });
 
   initializeSwipeGestures();
+
+  document.addEventListener("click", (event) => {
+    const nope = event.target.closest("#nopeBtn");
+    const like = event.target.closest("#likeBtn");
+    const superLike = event.target.closest("#superLikeBtn");
+    const undoBtn = event.target.closest("#undoBtn");
+
+    if (nope) {
+      event.preventDefault();
+      answerCurrent("nope");
+      return;
+    }
+
+    if (like) {
+      event.preventDefault();
+      answerCurrent("like");
+      return;
+    }
+
+    if (superLike) {
+      event.preventDefault();
+      answerCurrent("superlike");
+      return;
+    }
+
+    if (undoBtn) {
+      event.preventDefault();
+      undo();
+      return;
+    }
+  }, true);
 }
 
 function boot() {
@@ -2156,6 +2519,8 @@ function boot() {
   ensureAccountData();
   forceSingleAccount();
   applyAccountToLegacy();
+  mergeCustomStores();
+  if (state.nearbyStores?.length) setNearbyStatus(`周辺取得済み：${state.nearbyStores.length}件`);
   attachEvents();
   if ($("displayNameInput")) $("displayNameInput").value = state.displayName || "カイ";
   if ($("displayNameInputModal")) $("displayNameInputModal").value = state.displayName || "カイ";

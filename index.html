@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>メシマッチ v0.30</title>
-  <link rel="stylesheet" href="style.css?v=0.30" />
+  <title>メシマッチ v0.34</title>
+  <link rel="stylesheet" href="style.css?v=0.34" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#ff7a3d" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -140,6 +140,15 @@
           <button class="filter-chip" data-filter="飲み">飲み</button>
           <button class="filter-chip" data-filter="カフェ">カフェ</button>
         </div>
+
+        <div class="nearby-panel">
+          <div>
+            <strong>周辺店舗</strong>
+            <span id="nearbyStatusText">現在地から1km以内を取得できます</span>
+          </div>
+          <button id="fetchNearbyBtn" class="nearby-button">周辺取得</button>
+        </div>
+
 
         <div class="card-stage">
           <article id="storeCard" class="food-card">
@@ -337,8 +346,8 @@
       <div id="noticeListLegacy" class="notice-list">
         <article class="notice-item unread">
           <p class="notice-date">2026/04/28</p>
-          <h3>v0.30：スワイプ操作修正</h3>
-          <p>未判定完了後に全店舗へ戻ってしまう問題と、スマホのスワイプ操作を修正しました。</p>
+          <h3>v0.34：現在地1km圏内の店舗取得</h3>
+          <p>現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。</p>
         </article>
       </div>
           <div class="result-actions">
@@ -376,7 +385,7 @@
             <h3>アプリ情報</h3>
             <div class="info-list">
               <div><span>ブランド</span><strong>メシマッチ</strong></div>
-              <div><span>バージョン</span><strong>v0.30</strong></div>
+              <div><span>バージョン</span><strong>v0.34</strong></div>
               <div><span>状態</span><strong>フレンド型モック</strong></div>
             </div>
           </div>
@@ -419,7 +428,7 @@
 
     <footer class="app-footer">
       <span>メシマッチ</span>
-      <span>v0.30</span>
+      <span>v0.34</span>
     </footer>
   </div>
 
@@ -437,8 +446,8 @@
       <div id="noticeList" class="notice-list">
         <article class="notice-item unread">
           <p class="notice-date">2026/04/28</p>
-          <h3>v0.30：スワイプ操作修正</h3>
-          <p>未判定完了後に全店舗へ戻ってしまう問題と、スマホのスワイプ操作を修正しました。</p>
+          <h3>v0.34：現在地1km圏内の店舗取得</h3>
+          <p>現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。</p>
         </article>
         <article class="notice-item">
           <p class="notice-date">2026/04/28</p>
@@ -504,9 +513,7 @@
           <input id="blockFriendRequestsToggle" type="checkbox" />
         </label>
       </div>
-
-
-      <div class="settings-block data-management-block">
+<div class="settings-block data-management-block">
         <h3>データ管理</h3>
         <p class="mini-lead">
           Like / Nope / Superlike、友達、決定履歴、訪問状態、設定をJSONファイルとして移行できます。
@@ -527,7 +534,7 @@
         <h3>アプリ情報</h3>
         <div class="info-list">
           <div><span>ブランド</span><strong>メシマッチ</strong></div>
-          <div><span>バージョン</span><strong>v0.30</strong></div>
+          <div><span>バージョン</span><strong>v0.34</strong></div>
           <div><span>状態</span><strong>フレンド型モック</strong></div>
         </div>
       </div>
@@ -616,8 +623,7 @@
       </div>
     </div>
   </div>
-
-  <div id="toast" class="toast">コピーしました</div>
-  <script src="app.js?v=0.30"></script>
+<div id="toast" class="toast">コピーしました</div>
+  <script src="app.js?v=0.34"></script>
 </body>
 </html>

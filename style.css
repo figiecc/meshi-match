@@ -2635,3 +2635,188 @@ button:disabled {
 #doneScreen .panel.center {
   margin-top: 16px;
 }
+
+
+/* v0.32 store manager and safer swipe buttons */
+.store-manager-card {
+  max-height: min(88vh, 820px);
+}
+
+.store-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.store-description-label {
+  grid-column: 1 / -1;
+}
+
+.store-description-label textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px 16px;
+  color: var(--text);
+  outline: none;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.store-list-title {
+  margin-top: 18px;
+}
+
+.store-manager-list {
+  display: grid;
+  gap: 8px;
+}
+
+.store-manager-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #fff8ef;
+}
+
+.store-manager-item strong {
+  display: block;
+  font-size: 14px;
+}
+
+.store-manager-item span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.store-manager-item button {
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.store-edit-btn {
+  background: #231b14;
+  color: #fff;
+}
+
+.store-delete-btn {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid var(--line);
+}
+
+.action-row button,
+.superlike-button,
+.filter-chip {
+  pointer-events: auto;
+}
+
+@media (max-width: 520px) {
+  .store-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* v0.33 nearby store policy */
+.nearby-store-block {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 122, 61, 0.12), transparent 38%),
+    rgba(255,255,255,0.86);
+}
+
+/* v0.33: manual store manager is removed */
+.store-management-block,
+#storeManagerModal {
+  display: none !important;
+}
+
+
+/* v0.34 nearby store fetch */
+.nearby-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.86);
+}
+
+.nearby-panel strong {
+  display: block;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+}
+
+.nearby-panel span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.nearby-button {
+  width: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #231b14;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.nearby-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nearby-store-block {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 122, 61, 0.12), transparent 38%),
+    rgba(255,255,255,0.86);
+}
+
+@media (max-width: 520px) {
+  .nearby-panel {
+    padding: 8px 10px;
+  }
+
+  .nearby-button {
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
+  #swipeScreen .card-stage {
+    height: 398px;
+  }
+
+  #swipeScreen .food-card {
+    height: 390px;
+  }
+
+  #swipeScreen .image-band {
+    height: 132px;
+  }
+}
