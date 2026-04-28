@@ -2620,3 +2620,18 @@ button:disabled {
     radial-gradient(circle at 20% 0%, rgba(255, 122, 61, 0.13), transparent 38%),
     rgba(255,255,255,0.86);
 }
+
+
+/* v0.30 swipe stability */
+.food-card {
+  touch-action: none;
+  cursor: grab;
+}
+
+.food-card.dragging {
+  cursor: grabbing;
+}
+
+#doneScreen .panel.center {
+  margin-top: 16px;
+}

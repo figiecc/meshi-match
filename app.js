@@ -65,10 +65,15 @@ const initialFriendLikes = {
 
 const notices = [
   {
+    date: "2026/04/29",
+    title: "v0.30：スワイプ操作修正",
+    body: "未判定を見終わった後にスワイプへ戻ると全店舗が再表示される問題と、スマホのスワイプ操作を修正しました。",
+    unread: true
+  },
+  {
     date: "2026/04/28",
     title: "v0.29：データ移行とPWA化",
-    body: "データの書き出し/読み込みと、ホーム画面追加に向けたPWA対応を追加しました。",
-    unread: true
+    body: "データの書き出し/読み込みと、ホーム画面追加に向けたPWA対応を追加しました。"
   },
   {
     date: "2026/04/28",
@@ -84,21 +89,6 @@ const notices = [
     date: "2026/04/28",
     title: "v0.26：訪問状態追加",
     body: "店舗ごとに「未訪問 / 行ったことある / また行きたい / しばらくいい」を保存できるようにしました。"
-  },
-  {
-    date: "2026/04/28",
-    title: "v0.25：お知らせ履歴修正",
-    body: "お知らせIDの重複を解消し、モーダル側に過去のお知らせが縦に積み上がるように修正しました。"
-  },
-  {
-    date: "2026/04/28",
-    title: "v0.24：決定履歴とお知らせ履歴",
-    body: "決定履歴を保存し、再スワイプ時のSuperlikeを中央に配置しました。"
-  },
-  {
-    date: "2026/04/28",
-    title: "v0.23：仮アカウント管理",
-    body: "ログイン前提のデータ構造を追加しました。v0.27でユーザー切り替えは廃止しています。"
   }
 ];
 
@@ -297,15 +287,21 @@ function openSwipeTab() {
 
   if (!state.swipeQueue || !state.swipeQueue.length || state.index >= state.swipeQueue.length) {
     const unanswered = getUnansweredStores();
-    state.swipeQueue = unanswered.length ? unanswered.map(store => store.id) : getFilteredStores().map(store => store.id);
+    state.swipeQueue = unanswered.map(store => store.id);
     state.index = 0;
     state.historyStack = [];
   }
 
   saveState();
-  showScreen("swipeScreen");
   setActiveNav("swipeScreen");
-  renderCard();
+
+  if (!state.swipeQueue.length) {
+    showScreen("doneScreen");
+  } else {
+    showScreen("swipeScreen");
+    renderCard();
+  }
+
   requestAnimationFrame(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
@@ -841,11 +837,20 @@ function syncMoodFilterUI() {
 function setMoodFilter(filter) {
   state.activeFilter = filter || "all";
   const unanswered = getUnansweredStores();
-  state.swipeQueue = unanswered.length ? unanswered.map(store => store.id) : getFilteredStores().map(store => store.id);
+  state.swipeQueue = unanswered.map(store => store.id);
   state.index = 0;
   state.historyStack = [];
   saveState();
   syncMoodFilterUI();
+
+  if (!state.swipeQueue.length) {
+    showScreen("doneScreen");
+    setActiveNav("swipeScreen");
+    return;
+  }
+
+  showScreen("swipeScreen");
+  setActiveNav("swipeScreen");
   renderCard();
 }
 
@@ -853,6 +858,7 @@ function renderCard() {
   const store = currentStore();
   if (!store) {
     saveState();
+    setActiveNav("swipeScreen");
     showScreen("doneScreen");
     return;
   }
@@ -1770,43 +1776,90 @@ function escapeHtml(value) {
 
 function initializeSwipeGestures() {
   const card = $("storeCard");
+  if (!card || card.dataset.swipeBound === "true") return;
+  card.dataset.swipeBound = "true";
+
   let startX = 0;
   let currentX = 0;
   let dragging = false;
+  let pointerId = null;
+
+  function beginDrag(clientX, id = null) {
+    dragging = true;
+    pointerId = id;
+    startX = clientX;
+    currentX = 0;
+    card.classList.add("dragging");
+    card.style.transition = "none";
+  }
+
+  function moveDrag(clientX) {
+    if (!dragging) return;
+    currentX = clientX - startX;
+    const rotate = currentX / 18;
+    card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    pointerId = null;
+    card.classList.remove("dragging");
+    card.style.transition = "";
+    card.style.transform = "";
+
+    const threshold = 70;
+    const result = currentX;
+    currentX = 0;
+
+    if (result > threshold) answerCurrent("like");
+    else if (result < -threshold) answerCurrent("nope");
+  }
+
+  function cancelDrag() {
+    dragging = false;
+    pointerId = null;
+    currentX = 0;
+    card.classList.remove("dragging");
+    card.style.transition = "";
+    card.style.transform = "";
+  }
 
   card.addEventListener("pointerdown", (event) => {
-    dragging = true;
-    startX = event.clientX;
-    currentX = 0;
-    card.setPointerCapture(event.pointerId);
-    card.style.transition = "none";
+    if (event.button !== undefined && event.button !== 0) return;
+    beginDrag(event.clientX, event.pointerId);
+    try {
+      card.setPointerCapture(event.pointerId);
+    } catch {}
   });
 
   card.addEventListener("pointermove", (event) => {
-    if (!dragging) return;
-    currentX = event.clientX - startX;
-    const rotate = currentX / 18;
-    card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
+    if (pointerId !== null && event.pointerId !== pointerId) return;
+    moveDrag(event.clientX);
   });
 
-  card.addEventListener("pointerup", () => {
-    if (!dragging) return;
-    dragging = false;
-    card.style.transition = "";
-    card.style.transform = "";
-
-    if (currentX > 90) answerCurrent("like");
-    else if (currentX < -90) answerCurrent("nope");
-
-    currentX = 0;
+  card.addEventListener("pointerup", endDrag);
+  card.addEventListener("pointercancel", cancelDrag);
+  card.addEventListener("lostpointercapture", () => {
+    if (dragging) endDrag();
   });
 
-  card.addEventListener("pointercancel", () => {
-    dragging = false;
-    card.style.transition = "";
-    card.style.transform = "";
-    currentX = 0;
-  });
+  // Fallback for mobile browsers where pointer events can be unreliable inside PWAs.
+  card.addEventListener("touchstart", (event) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    beginDrag(touch.clientX, "touch");
+  }, { passive: true });
+
+  card.addEventListener("touchmove", (event) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    moveDrag(touch.clientX);
+    if (Math.abs(currentX) > 8) event.preventDefault();
+  }, { passive: false });
+
+  card.addEventListener("touchend", endDrag);
+  card.addEventListener("touchcancel", cancelDrag);
 }
 
 function closeNoticeModal() {
