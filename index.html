@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>メシマッチ v0.34</title>
-  <link rel="stylesheet" href="style.css?v=0.34" />
+  <title>メシマッチ v0.35</title>
+  <link rel="stylesheet" href="style.css?v=0.35" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#ff7a3d" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -160,7 +160,7 @@
                 <p id="cardGenre" class="genre">ラーメン</p>
                 <p id="cardPrice" class="price">¥¥</p>
               </div>
-              <h2 id="cardName">麺屋 星灯</h2>
+              <h2 id="cardName" class="card-name-link" title="詳細を見る">麺屋 星灯</h2>
               <p id="cardMeta" class="meta">徒歩6分 / ★4.2 / 営業中</p>
               <p id="cardDescription" class="description">濃い味で一気に満たしたい日に。</p>
               <div id="friendLikeLine" class="friend-like-badge hidden">相手もLikeしています</div>
@@ -346,8 +346,8 @@
       <div id="noticeListLegacy" class="notice-list">
         <article class="notice-item unread">
           <p class="notice-date">2026/04/28</p>
-          <h3>v0.34：現在地1km圏内の店舗取得</h3>
-          <p>現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。</p>
+          <h3>v0.35：詳細ページ初版</h3>
+          <p>店舗名タップで全画面詳細を開けるようにし、営業時間・住所・テイクアウト・メニュー・席数を見やすく整理しました。</p>
         </article>
       </div>
           <div class="result-actions">
@@ -385,7 +385,7 @@
             <h3>アプリ情報</h3>
             <div class="info-list">
               <div><span>ブランド</span><strong>メシマッチ</strong></div>
-              <div><span>バージョン</span><strong>v0.34</strong></div>
+              <div><span>バージョン</span><strong>v0.35</strong></div>
               <div><span>状態</span><strong>フレンド型モック</strong></div>
             </div>
           </div>
@@ -428,7 +428,7 @@
 
     <footer class="app-footer">
       <span>メシマッチ</span>
-      <span>v0.34</span>
+      <span>v0.35</span>
     </footer>
   </div>
 
@@ -446,8 +446,8 @@
       <div id="noticeList" class="notice-list">
         <article class="notice-item unread">
           <p class="notice-date">2026/04/28</p>
-          <h3>v0.34：現在地1km圏内の店舗取得</h3>
-          <p>現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。</p>
+          <h3>v0.35：詳細ページ初版</h3>
+          <p>店舗名タップで全画面詳細を開けるようにし、営業時間・住所・テイクアウト・メニュー・席数を見やすく整理しました。</p>
         </article>
         <article class="notice-item">
           <p class="notice-date">2026/04/28</p>
@@ -534,7 +534,7 @@
         <h3>アプリ情報</h3>
         <div class="info-list">
           <div><span>ブランド</span><strong>メシマッチ</strong></div>
-          <div><span>バージョン</span><strong>v0.34</strong></div>
+          <div><span>バージョン</span><strong>v0.35</strong></div>
           <div><span>状態</span><strong>フレンド型モック</strong></div>
         </div>
       </div>
@@ -585,45 +585,21 @@
   </div>
 
 
+  
   <div id="storeDetailModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
-    <div class="modal-card pop-card store-detail-card">
-      <div class="modal-head">
+    <div class="modal-card store-detail-card full-screen-detail">
+      <div class="store-detail-topbar">
         <div>
-          <p class="eyebrow">Rejudge Card</p>
-          <h2 id="detailStoreName">再判定</h2>
+          <p class="eyebrow">Store Detail</p>
+          <h2 id="detailStoreName">店舗詳細</h2>
         </div>
         <button id="closeStoreDetailModalBtn" class="icon-button">×</button>
       </div>
-
-      <div id="detailStoreBody"></div>
-
-
-      <div class="visit-status-panel">
-        <p class="mini-label">訪問状態</p>
-        <div class="visit-status-grid">
-          <button class="visit-status-button" data-visit-status="unvisited">未訪問</button>
-          <button class="visit-status-button" data-visit-status="visited">行ったことある</button>
-          <button class="visit-status-button" data-visit-status="want_again">また行きたい</button>
-          <button class="visit-status-button" data-visit-status="cooldown">しばらくいい</button>
-        </div>
-      </div>
-
-      <div class="detail-reaction-panel">
-        <p class="mini-label">判定を変更</p>
-        <div class="detail-reaction-grid">
-          <button class="detail-reaction nope" data-detail-action="nope">Nope</button>
-          <button class="detail-reaction like" data-detail-action="like">Like</button>
-          <button class="detail-reaction superlike" data-detail-action="superlike">Superlike</button>
-        </div>
-        <button id="detailUnansweredBtn" class="ghost-button compact-action">未判定に戻す</button>
-      </div>
-
-      <div class="result-actions">
-        <a id="detailMapLink" class="primary-button map-primary" target="_blank" rel="noopener">Mapsで開く</a>
-      </div>
+      <div id="detailStoreBody" class="store-detail-body-scroll"></div>
     </div>
   </div>
-<div id="toast" class="toast">コピーしました</div>
-  <script src="app.js?v=0.34"></script>
+
+  <div id="toast" class="toast">コピーしました</div>
+  <script src="app.js?v=0.35"></script>
 </body>
 </html>

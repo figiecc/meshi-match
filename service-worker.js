@@ -1,9 +1,9 @@
-const CACHE_NAME = "meshi-match-v0.34";
+const CACHE_NAME = "meshi-match-v0.35";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=0.34",
-  "./app.js?v=0.34",
+  "./style.css?v=0.35",
+  "./app.js?v=0.35",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"

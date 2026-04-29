@@ -66,9 +66,14 @@ const initialFriendLikes = {
 const notices = [
   {
     date: "2026/04/29",
-    title: "v0.34：現在地1km圏内の店舗取得",
-    body: "現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。取得結果は6時間キャッシュします。",
+    title: "v0.35：詳細ページ初版",
+    body: "店舗名タップで全画面詳細を開けるようにし、営業時間・住所・テイクアウト・メニュー・席数を整理して見られるようにしました。",
     unread: true
+  },
+  {
+    date: "2026/04/29",
+    title: "v0.34：現在地1km圏内の店舗取得",
+    body: "現在地から半径1km以内の飲食店をOpenStreetMap / Overpass APIから取得できるようにしました。"
   },
   {
     date: "2026/04/29",
@@ -84,11 +89,6 @@ const notices = [
     date: "2026/04/29",
     title: "v0.31：PWA自動更新強化",
     body: "ホーム画面に追加し直さなくても、アプリ起動時に最新版へ更新されやすいようにしました。"
-  },
-  {
-    date: "2026/04/29",
-    title: "v0.30：スワイプ操作修正",
-    body: "未判定を見終わった後の戻り動作と、スマホのスワイプ操作を修正しました。"
   }
 ];
 
@@ -138,6 +138,9 @@ const state = {
   nearbyCache: null,
   nearbyFetching: false
 };
+
+let detailPhotos = [];
+let detailPhotoIndex = 0;
 
 const $ = (id) => document.getElementById(id);
 const screens = [
@@ -386,6 +389,14 @@ function normalizeOsmStore(element, originLat, originLon) {
   const cuisine = tags.cuisine ? String(tags.cuisine).split(";").slice(0, 2) : [];
   const opening = tags.opening_hours ? "営業時間情報あり" : "営業未確認";
 
+  const addressParts = [
+    tags["addr:postcode"],
+    tags["addr:city"],
+    tags["addr:suburb"],
+    tags["addr:street"],
+    tags["addr:housenumber"]
+  ].filter(Boolean);
+
   return {
     id: `osm_${element.type}_${element.id}`,
     name,
@@ -399,7 +410,11 @@ function normalizeOsmStore(element, originLat, originLon) {
     tags: [genre, ...cuisine, "周辺取得"].slice(0, 5),
     lat,
     lon,
-    source: "openstreetmap"
+    source: "openstreetmap",
+    addressLine: addressParts.join(" ") || "住所情報なし（Mapsで確認）",
+    openingHoursRaw: tags.opening_hours || "",
+    takeout: tags.takeaway === "yes" ? "available" : tags.takeaway === "no" ? "unavailable" : "unknown",
+    photos: tags.image ? [tags.image] : []
   };
 }
 
@@ -1297,6 +1312,7 @@ function renderStoreList(containerId, storesToRender, type) {
   storesToRender.forEach((store, index) => {
     const item = document.createElement("article");
     item.className = `result-item ${type}`;
+    item.dataset.detailStore = store.id;
     const query = encodeURIComponent(`${store.name} ${store.genre}`);
     item.innerHTML = `
       <div class="result-item-top">
@@ -1829,9 +1845,201 @@ function setVisitStatus(storeId, status) {
   renderMyLikes();
 }
 
+const sampleStoreDetailTemplates = {
+  "ラーメン": { hours: "11:00〜22:00", takeout: "unavailable", menu: ["特製醤油ラーメン", "味玉塩ラーメン", "焼き餃子"], seats: "18席", color: "#ff8d63" },
+  "インドカレー": { hours: "11:00〜21:30", takeout: "available", menu: ["バターチキンカレー", "キーマカレー", "チーズナン"], seats: "28席", color: "#f29e4c" },
+  "定食": { hours: "11:00〜20:30", takeout: "unavailable", menu: ["日替わり定食", "焼き魚定食", "生姜焼き定食"], seats: "24席", color: "#e0a458" },
+  "寿司": { hours: "11:30〜21:00", takeout: "available", menu: ["握り盛り合わせ", "上ちらし", "茶碗蒸し"], seats: "20席", color: "#78c0e0" },
+  "ハンバーガー": { hours: "10:30〜21:00", takeout: "available", menu: ["チーズバーガー", "ベーコンバーガー", "ポテト"], seats: "22席", color: "#ff7a3d" },
+  "イタリアン": { hours: "11:30〜22:00", takeout: "available", menu: ["ボロネーゼ", "マルゲリータ", "ティラミス"], seats: "30席", color: "#d66b6b" },
+  "うどん": { hours: "10:00〜20:00", takeout: "available", menu: ["かけうどん", "温玉ぶっかけ", "ちくわ天"], seats: "16席", color: "#caa96b" },
+  "焼肉": { hours: "17:00〜23:00", takeout: "unavailable", menu: ["上カルビ", "ハラミ", "石焼ビビンバ"], seats: "34席", color: "#8a4f4f" },
+  "韓国料理": { hours: "11:30〜22:30", takeout: "available", menu: ["スンドゥブ", "ヤンニョムチキン", "キンパ"], seats: "26席", color: "#d84f4f" },
+  "カフェ": { hours: "09:00〜19:00", takeout: "available", menu: ["ブレンドコーヒー", "サンドイッチ", "チーズケーキ"], seats: "26席", color: "#8b6f5c" },
+  "牛丼": { hours: "00:00〜23:59", takeout: "available", menu: ["牛丼並", "ねぎ玉牛丼", "豚汁"], seats: "20席", color: "#b58552" },
+  "ピザ": { hours: "11:00〜22:00", takeout: "available", menu: ["マルゲリータ", "照り焼きチキン", "ポテト"], seats: "18席", color: "#d86c3c" },
+  "とんかつ": { hours: "11:00〜21:00", takeout: "available", menu: ["ロースかつ定食", "ヒレかつ定食", "かつ丼"], seats: "18席", color: "#a46a43" },
+  "タイ料理": { hours: "11:30〜22:00", takeout: "available", menu: ["ガパオライス", "グリーンカレー", "トムヤムクン"], seats: "24席", color: "#6aa84f" },
+  "そば": { hours: "11:00〜20:30", takeout: "unavailable", menu: ["もりそば", "天ぷらそば", "鴨南蛮"], seats: "18席", color: "#8f7b5a" },
+  "洋食": { hours: "11:00〜21:00", takeout: "available", menu: ["オムライス", "ハンバーグ", "プリン"], seats: "24席", color: "#d7a447" },
+  "居酒屋": { hours: "17:00〜23:30", takeout: "unavailable", menu: ["串焼き", "だし巻き卵", "ポテサラ"], seats: "36席", color: "#5a4a42" },
+  "サラダ": { hours: "10:30〜20:00", takeout: "available", menu: ["グリーンボウル", "チキンサラダ", "スープ"], seats: "20席", color: "#6ca870" },
+  "唐揚げ": { hours: "11:00〜21:30", takeout: "available", menu: ["唐揚げ弁当", "塩唐揚げ", "手羽先"], seats: "14席", color: "#c7894b" },
+  "スイーツ": { hours: "11:00〜20:00", takeout: "available", menu: ["ショートケーキ", "プリン", "シュークリーム"], seats: "18席", color: "#d08fb3" },
+  "default": { hours: "11:00〜20:00", takeout: "unknown", menu: [], seats: "", color: "#ff7a3d" }
+};
+
+const sampleAreas = [
+  "東京都渋谷区神南（サンプル）",
+  "東京都渋谷区宇田川町（サンプル）",
+  "東京都渋谷区道玄坂（サンプル）",
+  "東京都渋谷区桜丘町（サンプル）",
+  "東京都渋谷区恵比寿西（サンプル）"
+];
+
+function hashString(input = "") {
+  return Array.from(input).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+}
+
+function sampleAddressForStore(store) {
+  return sampleAreas[hashString(store.id) % sampleAreas.length];
+}
+
+function parseHoursRange(hoursText) {
+  if (!hoursText) return null;
+  const match = String(hoursText).match(/(\d{1,2}):(\d{2})\s*[〜\-]\s*(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+
+  const [, sh, sm, eh, em] = match;
+  return {
+    start: Number(sh) * 60 + Number(sm),
+    end: Number(eh) * 60 + Number(em)
+  };
+}
+
+function getOpeningInfo(hoursText, forceUnknown = false) {
+  if (forceUnknown || !hoursText) {
+    return {
+      state: "unknown",
+      label: "営業時間情報なし",
+      todayLine: "今日の営業時間 情報なし"
+    };
+  }
+
+  const range = parseHoursRange(hoursText);
+  if (!range) {
+    return {
+      state: "unknown",
+      label: "営業時間情報なし",
+      todayLine: "今日の営業時間 情報あり（詳細未解析）"
+    };
+  }
+
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  let isOpen = false;
+
+  if (range.end >= range.start) {
+    isOpen = current >= range.start && current <= range.end;
+  } else {
+    isOpen = current >= range.start || current <= range.end;
+  }
+
+  return {
+    state: isOpen ? "open" : "closed",
+    label: isOpen ? "営業中" : "営業時間外",
+    todayLine: `今日の営業時間 ${hoursText}`
+  };
+}
+
+function takeoutLabel(value) {
+  if (value === "available") return "テイクアウト可";
+  if (value === "unavailable") return "テイクアウト不可";
+  return "テイクアウト情報なし";
+}
+
+function svgToDataUrl(svg) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function buildPhotoSlide(store, title, subtitle, accent = "#ff7a3d") {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="${accent}"/>
+          <stop offset="100%" stop-color="#231b14"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="800" fill="url(#g)"/>
+      <circle cx="220" cy="180" r="180" fill="rgba(255,255,255,0.12)"/>
+      <circle cx="980" cy="640" r="220" fill="rgba(255,255,255,0.08)"/>
+      <text x="80" y="240" font-size="180">${store.emoji || "🍽️"}</text>
+      <text x="80" y="470" fill="#fffdf9" font-size="68" font-weight="700">${title}</text>
+      <text x="84" y="540" fill="rgba(255,253,249,0.92)" font-size="34" font-weight="500">${subtitle}</text>
+      <text x="84" y="650" fill="rgba(255,253,249,0.72)" font-size="28">Meshi Match Detail Preview</text>
+    </svg>
+  `;
+  return svgToDataUrl(svg);
+}
+
+function getStoreDetailData(store) {
+  const template = sampleStoreDetailTemplates[store.genre] || sampleStoreDetailTemplates.default;
+  const nearby = store.source === "openstreetmap";
+
+  const openingSource = nearby ? store.openingHoursRaw : template.hours;
+  const openingInfo = getOpeningInfo(openingSource, nearby && !store.openingHoursRaw);
+
+  const photos = Array.isArray(store.photos) && store.photos.length
+    ? store.photos
+    : nearby
+      ? []
+      : [
+          buildPhotoSlide(store, store.name, template.menu[0] || store.genre, template.color),
+          buildPhotoSlide(store, "おすすめ", template.menu[1] || takeoutLabel(template.takeout), template.color),
+          buildPhotoSlide(store, "店舗情報", `${openingInfo.todayLine} / ${takeoutLabel(template.takeout)}`, template.color)
+        ];
+
+  return {
+    photos,
+    openingState: openingInfo.state,
+    openingLabel: openingInfo.label,
+    todayLine: openingInfo.todayLine,
+    addressLine: store.addressLine || (nearby ? "住所情報なし（Mapsで確認）" : sampleAddressForStore(store)),
+    mapHref: store.lat && store.lon
+      ? `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lon}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${store.name} ${store.genre}`)}`,
+    takeoutText: nearby ? takeoutLabel(store.takeout) : takeoutLabel(template.takeout),
+    menuItems: nearby ? [] : (store.menuItems || template.menu || []).slice(0, 3),
+    seatsText: nearby ? "" : (store.seatsText || template.seats || ""),
+    note: nearby
+      ? "周辺取得店舗は、写真・営業時間・テイクアウト情報が不足する場合があります。"
+      : "サンプル店舗の詳細情報です。周辺取得店舗は情報量が少ない場合があります。"
+  };
+}
+
+function renderDetailPhotoView(store) {
+  const image = $("detailPhotoImage");
+  const placeholder = $("detailPhotoPlaceholder");
+  const indicators = $("detailPhotoIndicators");
+  const left = $("detailPhotoPrevZone");
+  const right = $("detailPhotoNextZone");
+
+  if (!image || !placeholder || !indicators || !left || !right) return;
+
+  if (!detailPhotos.length) {
+    image.classList.add("hidden");
+    placeholder.classList.remove("hidden");
+    indicators.innerHTML = "";
+    left.classList.add("single");
+    right.classList.add("single");
+    return;
+  }
+
+  const current = detailPhotos[detailPhotoIndex] || detailPhotos[0];
+  image.src = current;
+  image.classList.remove("hidden");
+  placeholder.classList.add("hidden");
+
+  left.classList.toggle("single", detailPhotos.length <= 1);
+  right.classList.toggle("single", detailPhotos.length <= 1);
+
+  indicators.innerHTML = "";
+  detailPhotos.forEach((_, index) => {
+    const dot = document.createElement("span");
+    dot.className = `detail-photo-dot ${index === detailPhotoIndex ? "active" : ""}`;
+    indicators.appendChild(dot);
+  });
+}
+
+function changeDetailPhoto(step) {
+  if (!detailPhotos.length) return;
+  detailPhotoIndex = (detailPhotoIndex + step + detailPhotos.length) % detailPhotos.length;
+  renderDetailPhotoView(getStore(state.detailStoreId));
+}
 function syncVisitStatusButtons(storeId) {
   const current = getVisitStatus(storeId);
-  document.querySelectorAll("[data-visit-status]").forEach(btn => {
+  $("detailStoreBody")?.querySelectorAll("[data-visit-status]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.visitStatus === current);
   });
 }
@@ -1843,33 +2051,80 @@ function openStoreDetail(storeId) {
   state.detailStoreId = storeId;
   saveState();
 
-  const likedFriends = friendLikeNamesForStore(store.id);
-  const current = state.myAnswers[store.id];
-  const mapQuery = encodeURIComponent(`${store.name} ${store.genre}`);
+  const detail = getStoreDetailData(store);
+  detailPhotos = detail.photos;
+  detailPhotoIndex = 0;
 
-  $("detailStoreName").textContent = `${store.emoji} ${store.name}`;
+  $("detailStoreName").textContent = store.name;
   $("detailStoreBody").innerHTML = `
-    <div class="detail-hero">
-      <div class="detail-emoji">${store.emoji}</div>
-      <div class="detail-meta">
-        <span>${escapeHtml(store.genre)}</span>
-        <span>${escapeHtml(store.distance)}</span>
-        <span>${escapeHtml(store.price)}</span>
-        <span>${escapeHtml(store.rating)}</span>
-        <span>${escapeHtml(store.status)}</span>
+    <div class="detail-page">
+      <div class="detail-photo-stage">
+        <img id="detailPhotoImage" class="detail-photo-image hidden" alt="${escapeHtml(store.name)}" />
+        <div id="detailPhotoPlaceholder" class="detail-photo-placeholder">
+          <div class="placeholder-inner">
+            <div class="placeholder-emoji">${store.emoji}</div>
+            <strong>${escapeHtml(store.name)}</strong>
+            <span>写真情報なし</span>
+          </div>
+        </div>
+        <button id="detailPhotoPrevZone" class="detail-photo-zone left" data-photo-nav="-1" aria-label="前の画像"></button>
+        <button id="detailPhotoNextZone" class="detail-photo-zone right" data-photo-nav="1" aria-label="次の画像"></button>
+        <div id="detailPhotoIndicators" class="detail-photo-indicators"></div>
       </div>
-      <p class="detail-description">${escapeHtml(store.description)}</p>
-      <div class="tag-row">${store.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
-      <span class="current-judgement">現在：${judgementLabel(current)}</span>
-      <span class="visit-status-badge ${getVisitStatus(store.id)}">訪問状態：${visitStatusLabel(getVisitStatus(store.id))}</span>
-      <div class="rejudge-card-note">友人に連れられて行った後や、気分が変わった時はここで判定を更新できます。</div>
-      <div class="detail-friends">
-        ${likedFriends.length ? `${likedFriends.map(escapeHtml).join("・")}もLikeしています` : "この店をLikeしているフレンドはまだいません"}
+
+      <div class="detail-main">
+        <h1 class="detail-title">${escapeHtml(store.name)}</h1>
+
+        <section class="store-info-block">
+          <h3>店舗情報</h3>
+
+          <div class="detail-info-row">
+            <span class="opening-badge ${detail.openingState}">${detail.openingLabel}</span>
+            <div class="detail-hours-line">${escapeHtml(detail.todayLine)}</div>
+          </div>
+
+          <div class="detail-info-row detail-address-row">
+            <div class="detail-address-line">${escapeHtml(detail.addressLine)}</div>
+            <a class="detail-maps-link" href="${detail.mapHref}" target="_blank" rel="noopener">Maps</a>
+          </div>
+
+          <div class="detail-info-row">
+            <div class="detail-takeout-line">${escapeHtml(detail.takeoutText)}</div>
+          </div>
+
+          ${detail.menuItems.length ? `
+            <div class="detail-subsection">
+              <div class="detail-subsection-title">簡単なメニュー</div>
+              <ul class="detail-menu-list">
+                ${detail.menuItems.map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+              </ul>
+            </div>
+          ` : ""}
+
+          ${detail.seatsText ? `
+            <div class="detail-subsection">
+              <div class="detail-seats-line">席数 ${escapeHtml(detail.seatsText)}</div>
+            </div>
+          ` : ""}
+
+          <div class="detail-subsection detail-visit-panel">
+            <div class="detail-subsection-title">訪問状態</div>
+            <div class="visit-status-grid">
+              <button class="visit-status-button" data-visit-status="unvisited">未訪問</button>
+              <button class="visit-status-button" data-visit-status="visited">行ったことある</button>
+              <button class="visit-status-button" data-visit-status="want_again">また行きたい</button>
+              <button class="visit-status-button" data-visit-status="cooldown">しばらくいい</button>
+            </div>
+            <span class="visit-status-badge ${getVisitStatus(store.id)}">訪問状態：${visitStatusLabel(getVisitStatus(store.id))}</span>
+          </div>
+        </section>
+
+        <p class="detail-page-note">${escapeHtml(detail.note)}</p>
       </div>
     </div>
   `;
 
-  $("detailMapLink").href = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
+  renderDetailPhotoView(store);
   $("storeDetailModal").classList.remove("hidden");
   syncVisitStatusButtons(storeId);
   document.body.classList.add("modal-open");
@@ -2341,6 +2596,22 @@ function attachEvents() {
   on("settingsBtn", "click", openSettings);
 
   on("refreshSwipeBtn", "click", openSwipeTab);
+  on("cardName", "click", () => {
+    const store = currentStore();
+    if (store) openStoreDetail(store.id);
+  });
+  on("detailStoreBody", "click", (event) => {
+    const nav = event.target.closest("[data-photo-nav]");
+    if (nav) {
+      changeDetailPhoto(Number(nav.dataset.photoNav || 0));
+      return;
+    }
+
+    const visit = event.target.closest("[data-visit-status]");
+    if (visit && state.detailStoreId) {
+      setVisitStatus(state.detailStoreId, visit.dataset.visitStatus);
+    }
+  });
   on("openMyLikesBtn", "click", renderMyLikes);
   on("homeOpenFriendsBtn", "click", showFriendsTab);
   on("homeOpenLikesBtn", "click", renderMyLikes);
@@ -2474,8 +2745,15 @@ function attachEvents() {
   ["commonList", "friendOnlyList", "myOnlyList", "myLikesList", "myLikesFolderList"].forEach(id => {
     on(id, "click", (event) => {
       const btn = event.target.closest(".decide-button");
-      if (!btn) return;
-      decideStore(btn.dataset.storeId);
+      if (btn) {
+        decideStore(btn.dataset.storeId);
+        return;
+      }
+
+      const detailRow = event.target.closest("[data-detail-store]");
+      if (detailRow && !event.target.closest("a,button")) {
+        openStoreDetail(detailRow.dataset.detailStore);
+      }
     });
   });
 
